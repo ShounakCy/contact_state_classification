@@ -7,9 +7,12 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn_som.som import SOM
 from . import config as cfg
 from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import ShuffleSplit
+import matplotlib.pyplot as plt
+
 
 
 class CSClassifier:
@@ -38,7 +41,7 @@ class CSClassifier:
 
         # Train the classifier
         self.load_data()
-        self.setup_classifier(cfg.params["use_pca"])
+        self.setup_classifier(cfg.params["use_pca"], cfg.params["use_lda"] )
 
         self.get_dataset_information()
 
@@ -66,7 +69,7 @@ class CSClassifier:
                 feature_values[label].append(self.csd_data_dict[feature][traj_index])
         return feature_values
 
-    def setup_classifier(self, use_pca=False):
+    def setup_classifier(self, use_pca=False, use_lda=False):
         self.lb = preprocessing.LabelBinarizer()
         self.X, self.y = self.extract_features_from_df(self.csd_data_df)
         self.X = np.array(self.X)
@@ -86,11 +89,15 @@ class CSClassifier:
             self.classifier = KNeighborsClassifier(n_neighbors=cfg.params["n_neighbors"])
             if use_pca:
                 self.pca()
+            if use_lda:
+                self.lda()
             self.classifier.fit(self.X, self.y)
         elif cfg.params["classifier"] == "SOM":
             self.classifier = SOM(m=6, n=1, dim=self.X.shape[1])
             if use_pca:
                 self.pca()
+            if use_lda:
+                self.lda()
             self.classifier.fit(self.X, epochs=10, shuffle=False)
         else:
             return
@@ -104,7 +111,6 @@ class CSClassifier:
             return
         else:
             return
-
 
     def fit(self):
         if cfg.params["classifier"] == "KNN":
@@ -134,6 +140,28 @@ class CSClassifier:
         print(pca.explained_variance_ratio_)
         print(pca.explained_variance_)
 
+
+    def plot(self, use_pca=False, use_lda=False):
+        plt.subplot(1, 1, 1)
+        for color, label in zip('rgbck', ('CS1', 'CS2', 'CS3', 'CS5', 'CS6')):
+            plt.scatter(self.X[self.y == label, 0], self.X[self.y == label, 1],
+                        c=color, label='{}'.format(label), cmap="plasma")
+
+        plt.title('Point Cloud after LDA Transformation with 2 DC',
+                      fontsize=14)
+        plt.xlabel("1st DC")
+        plt.ylabel("2nd DC")
+        plt.legend()
+        plt.show()
+
+    def lda(self):
+        lda = LDA(n_components=2)
+        lda.fit(self.X, self.y)
+        self.X = lda.transform(self.X)
+        print("LDA variance ratio:", lda.explained_variance_ratio_)
+
+
+
     @staticmethod
     def extract_features_from_df(df):
         X = []
@@ -148,19 +176,4 @@ class CSClassifier:
             y.append(row["label"])
         X = np.array(X)
         y = np.array(y)
-        return X, y
-
-    @staticmethod
-    def extract_features_from_df_for_shapelet(df):
-        X = []
-        y = []
-        for index, row in df.iterrows():
-            x = np.zeros((cfg.params["n_act"], 0))
-            for feature in cfg.params["simple_features"]:
-                x = np.hstack((x, np.array(row[feature]).reshape((cfg.params["n_act"], 1))))
-            for feature in cfg.params["complex_features"]:
-                x = np.hstack((x, np.array(row[feature])))
-            X.append(x)
-            y.append(row["label"])
-        X = np.array(X)
         return X, y

@@ -1,27 +1,25 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
-import matplotlib.pyplot as plt
-from visdom import Visdom
-import numpy as np
 import pandas as pd
-import math
-import os.path
-import getpass
-from sys import platform as _platform
-from six.moves import urllib
-from contact_state_classification import config as cfg
-
+import os
+import numpy as np
+from loguru import logger
+import sys
 # Load dateloader
+from scipy.stats import gaussian_kde
+from sklearn import preprocessing
+from sklearn.neighbors import KNeighborsClassifier
 import contact_state_classification as csc
-from contact_state_classification import utils
+import numpy as np
+from contact_state_classification import config as cfg
+import pandas as pd
+import seaborn as sns
+import random
+import matplotlib.pyplot as plt
 
 
 def main():
     experiment_dir = csc.config.path["experiment_dir"]
     cs_classifier = csc.CSClassifier(experiment_dir=experiment_dir, dataset_name=csc.config.path["dataset_name"])
+    #cs_classifier.pca(n_components=5)
     # test_idx = [74]
     # df = cs_classifier.csd_data_df.iloc[test_idx]
     # X, y = csc.CSClassifier.extract_features_from_df(df)
@@ -30,21 +28,8 @@ def main():
     # print(result)
     # print(y)
     cs_classifier.cross_val_score(42)
-    # Plot the distances
-    viz = Visdom()
-    assert viz.check_connection()
-    try:
-        viz.scatter(
-            X=cs_classifier.X,
-            Y=[cfg.params["cs_index_map"][x] for x in cs_classifier.y],
-            opts=dict(
-                legend=list(cfg.params["cs_index_map"].keys()),
-                markersize=10,
-            )
-        )
-    except BaseException as err:
-        print('Skipped matplotlib example')
-        print('Error message: ', err)
+    cs_classifier.plot()
+
 
 
 if __name__ == "__main__":
