@@ -14,6 +14,7 @@ import pandas as pd
 import seaborn as sns
 import random
 import matplotlib.pyplot as plt
+from visdom import Visdom
 
 
 def main():
@@ -27,8 +28,8 @@ def main():
     # print(cs_classifier.classifier.transform(X))
     # print(result)
     # print(y)
-    cs_classifier.cross_val_score(42)
-    cs_classifier.plot()
+    #cs_classifier.cross_val_score(42)
+    #cs_classifier.plot()
 
 
 
