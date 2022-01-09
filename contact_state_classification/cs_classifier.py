@@ -1,34 +1,37 @@
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from loguru import logger
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.pipeline import Pipeline
-from sktime.classification.interval_based import TimeSeriesForestClassifier
-from sktime.classification.shapelet_based import MrSEQLClassifier
-from sktime.transformations.panel.compose import ColumnConcatenator
-from visdom import Visdom
-
+from sklearn_som.som import SOM
 from tslearn.shapelets import LearningShapelets, \
     grabocka_params_to_shapelet_size_dict
+from tslearn.utils import ts_size
+from visdom import Visdom
 
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+
+from sktime.classification.compose import ColumnEnsembleClassifier
+from sktime.classification.dictionary_based import BOSSEnsemble
+from sktime.classification.interval_based import TimeSeriesForestClassifier
+from sktime.classification.shapelet_based import MrSEQLClassifier
+from sktime.datasets import load_basic_motions
+from sktime.transformations.panel.compose import ColumnConcatenator
+from sktime.datasets import load_basic_motions
+import contact_state_classification as csc
 from . import config as cfg
-import tensorflow as tf
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
-# import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = "0"
-#
-# # Path to root of this project, contains lots of modules
-# import sys
-# sys.path.insert(0, os.path.abspath('../'))
-# sys.path.insert(0, os.getcwd())
 
 
 class CSClassifier:
@@ -88,35 +91,32 @@ class CSClassifier:
         return feature_values
 
     def setup_classifier(self, use_pca=False, use_lda=False):
+        num_labels = np.unique(self.y, axis=0).shape[0]
         self.lb = preprocessing.LabelBinarizer()
-        if cfg.params["classifier"] == "MVC_1":
-            self.X, self.y = CSClassifier.extract_features_from_df_for_mvc(self.csd_data_df)
-            print("MVC_Shape",self.X.shape)
+        
+        if cfg.params["classifier"] == "SHP":
+            self.X, self.y = CSClassifier.extract_features_from_df_for_shapelet(self.csd_data_df)
+            print(cfg.params["classifier"],self.X.shape)
         else:
             self.X, self.y = self.extract_features_from_df(self.csd_data_df)
-            #print("KNN_X_Shape",self.X.shape)
+            print("X_Shape",self.X.shape)
             self.X = np.array(self.X)
+            print(self.X)
         self.lb.fit(self.y)
+        print("ok")
         # self.y = self.lb.transform(self.y)
-        num_labels = np.unique(self.y, axis=0).shape[0]
+        
         if use_pca:
             self.pca()
         if use_lda:
             self.lda()
-        if cfg.params["classifier"] == "KNN":
-            self.classifier = KNeighborsClassifier(n_neighbors=cfg.params["n_neighbors"])
-            print("KNN_shape",self.X.shape)
-            self.classifier.fit(self.X, self.y)
 
-            if cfg.params["basic_visualization"]:
-                self.basic_visualization()
-
-
-
-        elif cfg.params["classifier"] == "MVC_1":
+        
+        
+        if cfg.params["classifier"] == "MVC_1":
             # Time series concatenation
             # Concatenation of time series columns into a single long time series column via ColumnConcatenator and apply a classifier to the concatenated data,
-
+            #Time Series Forest Classifier
             steps = [
                 ("concatenate", ColumnConcatenator()),
                 ("classify", TimeSeriesForestClassifier(n_estimators=100)),
@@ -125,15 +125,43 @@ class CSClassifier:
             print("MVC_1_shape", self.X.shape)
             self.classifier.fit(self.X, self.y)
 
-            if cfg.params["mvc_visualization"]:
-               self.mvc_visualization()
 
-        elif cfg.params["classifier"] == "MVC_2":
-            self.classifier = MrSEQLClassifier()
+
+        if cfg.params["classifier"] == "KNN":
+            self.classifier = KNeighborsClassifier(n_neighbors=cfg.params["n_neighbors"])
+            print("KNN_shape",self.X.shape)
             self.classifier.fit(self.X, self.y)
 
             if cfg.params["basic_visualization"]:
                 self.basic_visualization()
+        
+
+
+        elif cfg.params["classifier"] == "SHP":
+            n_ts, ts_sz = self.X.shape[:2]
+            n_classes = len(set(self.y))
+
+            # Set the number of shapelets per size as done in the original paper
+            shapelet_sizes = grabocka_params_to_shapelet_size_dict(n_ts=n_ts,
+                                                                   ts_sz=ts_sz,
+                                                                   n_classes=n_classes,
+                                                                   l=0.4,
+                                                                   r=1)
+            print(shapelet_sizes)
+            # Define the model using parameters provided by the authors (except that we
+            # use fewer iterations here)
+            self.classifier = LearningShapelets(n_shapelets_per_size=shapelet_sizes,
+                                        optimizer=tf.optimizers.Adam(.01),
+                                        batch_size=16,
+                                        weight_regularizer=.01,
+                                        max_iter=400,
+                                        random_state=42,
+                                        verbose=0)
+            self.classifier.fit(self.X, self.y)
+            if cfg.params["basic_visualization"]:
+                self.shapelet_visualization(shapelet_sizes)
+
+        
 
         else:
             return
@@ -147,22 +175,37 @@ class CSClassifier:
             self.accuracy_score = sum(score) / len(score)
             print("score", self.accuracy_score)
             return self.accuracy_score
-        elif cfg.params["classifier"] == "SOM":
-            return
+
 
         elif cfg.params["classifier"] == "MVC_1":
 
+           for train_index, test_index in skf.split(self.X, self.y):
+                X_train, X_test = self.X[train_index], self.X[test_index]
+                y_train, y_test = self.y[train_index], self.y[test_index]
+                
+                self.classifier.fit(X_train, y_train)
+                pred_labels = self.classifier.predict(X_test)
+                print("Correct classification rate:", accuracy_score(y_test, pred_labels))
+                
+                return self.accuracy_score
+        
+        elif cfg.params["classifier"] == "DTW":
+            
             for train_index, test_index in skf.split(self.X, self.y):
                 X_train, X_test = self.X[train_index], self.X[test_index]
                 y_train, y_test = self.y[train_index], self.y[test_index]
+                from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
+
+                self.classifier = KNeighborsTimeSeriesClassifier(n_neighbors=4, distance="dtw")
+
+
                 self.classifier.fit(X_train, y_train)
                 pred_labels = self.classifier.predict(X_test)
-                score = accuracy_score(y_test, pred_labels)
-                self.accuracy.append(score)
-                #return self.accuracy_score
-            self.accuracy_score = sum(self.accuracy)/len(self.accuracy)
-            print(self.accuracy_score)
-            return self.accuracy_score
+                print("Correct classification rate:", accuracy_score(y_test, pred_labels))
+                
+                
+                return self.accuracy_score
+
 
 
 
@@ -227,7 +270,7 @@ class CSClassifier:
         return X, y
 
     @staticmethod
-    def extract_features_from_df_for_mvc(df):
+    def extract_features_from_df_for_shapelet(df):
         X = []
         y = []
         for index, row in df.iterrows():
@@ -241,6 +284,8 @@ class CSClassifier:
         X = np.array(X)
         y = np.array(y)
         return X, y
+
+    
 
     def basic_visualization(self):
         # Plot the distances
@@ -267,4 +312,63 @@ class CSClassifier:
         except BaseException as err:
             print('Skipped matplotlib example')
             print('Error message: ', err)
+
+    def shapelet_visualization(self, shapelet_sizes):
+        XX = self.X
+        distances = self.classifier.transform(self.X)
+        # Make predictions and calculate accuracy score
+        pred_labels = self.classifier.predict(self.X)
+        print("Correct classification rate:", accuracy_score(self.y, pred_labels))
+
+        # Plot the different discovered shapelets
+        plt.figure()
+        for i, sz in enumerate(shapelet_sizes.keys()):
+            plt.subplot(len(shapelet_sizes), 1, i + 1)
+            plt.title("%d shapelets of size %d" % (shapelet_sizes[sz], sz))
+            for shp in self.classifier.shapelets_:
+                if ts_size(shp) == sz:
+                    plt.plot(shp.ravel())
+            plt.xlim([0, max(shapelet_sizes.keys()) - 1])
+
+        plt.tight_layout()
+        plt.show()
+
+        # The loss history is accessible via the `model_` that is a keras model
+        plt.figure()
+        plt.plot(np.arange(1, self.classifier.n_iter_ + 1), self.classifier.history_["loss"])
+        plt.title("Evolution of cross-entropy loss during training")
+        plt.xlabel("Epochs")
+        plt.show()
+
+        viz = Visdom()
+        assert viz.check_connection()
+        try:
+            for i, sz in enumerate(shapelet_sizes.keys()):
+                viz.scatter(
+                    X=distances,
+                    Y=[cfg.params["cs_index_map"][x] for x in pred_labels],
+                    opts=dict(
+                        legend=list(cfg.params["cs_index_map"].keys()),
+                        markersize=5,
+                        title="%d shapelets of size %d" % (shapelet_sizes[sz], sz),
+                        xlabel="Distance to 1st Shapelet",
+                        ylabel="Distance to 2nd Shapelet",
+                        zlabel="Distance to 3rd Shapelet",
+                    )
+                )
+
+        except BaseException as err:
+            print('Skipped matplotlib example')
+            print('Error message: ', err)
+
+    def extract_df(self, X):
+        columns_simple_features = ['act' + str(y) + ' ' + x for x in cfg.params["simple_features"] for y in
+                                   range(0, cfg.params["n_act"])]
+        columns_complex_features = ['act_' + str(y) + ' joint_' + str(z) + ' ' + x for x in
+                                    cfg.params["complex_features"] for y in
+                                    range(0, cfg.params["n_act"]) for z in range(self.csd_data_dict[x][0][0].shape[0])]
+        X_df = pd.DataFrame(data=X, index=range(0, X.shape[0]),
+                                 columns=columns_simple_features + columns_complex_features)
+        y_df = pd.DataFrame(data=self.y, index=range(0, len(self.y)), columns=['label'])
+        return X_df.join(y_df)
 
