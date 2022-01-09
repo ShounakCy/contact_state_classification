@@ -19,8 +19,9 @@ from visdom import Visdom
 
 def main():
     experiment_dir = csc.config.path["experiment_dir"]
-    cs_classifier = csc.CSClassifier(experiment_dir=experiment_dir, dataset_name=csc.config.path["dataset_name"])
-    
+    cs_classifier = csc.CSClassifier(experiment_dir=experiment_dir,
+                                     dataset_name_list=csc.config.path["dataset"],
+                                     test_set_name_list=csc.config.path["test_set"])    
     cs_classifier.cross_val_score(42)
     
 

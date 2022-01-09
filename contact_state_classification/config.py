@@ -1,8 +1,9 @@
 # This is where all file names and path-related parameters are stored.
 path = {
     "experiment_dir": "/home/shounak/Desktop/TUB/contact_state_classification/contact_state_classification",
-    "dataset": ["RoboticsProject2510"],
-    "test_set": ["RoboticsProject2510"]
+    "dataset": ["RoboticsProject0112"],
+    "test_set": ["RoboticsProject2510_2"]
+    #"test_set": ["RoboticsProject2510"]
 }
 # This is where all classifier configuration parameters are stored.
 # Since different classifiers may be used, parameters may need to be nested.
@@ -10,6 +11,7 @@ params = {
     "n_act": 12,
     "use_pca": False,
     "use_lda": False,
+    "use_test_set": True,
     "simple_features": ["dist"],
     "complex_features": [],
     "n_splits": 8,
