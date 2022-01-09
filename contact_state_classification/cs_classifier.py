@@ -16,6 +16,7 @@ from tslearn.shapelets import LearningShapelets, \
     grabocka_params_to_shapelet_size_dict
 from tslearn.utils import ts_size
 from visdom import Visdom
+from tensorflow.keras.optimizers import Adam
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -32,6 +33,7 @@ import contact_state_classification as csc
 from . import config as cfg
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
+from tslearn.preprocessing import TimeSeriesScalerMinMax
 
 
 
@@ -56,6 +58,7 @@ class CSClassifier:
         self.X_df = None
         self.accuracy_score = None
         self.accuracy =[]
+        self.shapelet_sizes =None
 
         # Classifier
         self.lb = None
@@ -142,12 +145,37 @@ class CSClassifier:
         if cfg.params["classifier"] == "DTW":
             self.classifier = KNeighborsTimeSeriesClassifier(n_neighbors=cfg.params["n_neighbors"], distance="dtw")
             self.classifier.fit(self.X, self.y)
+        
+        if cfg.params["classifier"] == "SHP":
+            n_ts, ts_sz = self.X.shape[:2]
+            n_classes = len(set(self.y))
+
+            # Set the number of shapelets per size as done in the original paper
+            self.shapelet_sizes = grabocka_params_to_shapelet_size_dict(n_ts=n_ts,
+                                                                   ts_sz=ts_sz,
+                                                                   n_classes=n_classes,
+                                                                   l=0.4,
+                                                                   r=1)
+            print("size",self.shapelet_sizes)
+            # Define the model using parameters provided by the authors (except that we
+            # use fewer iterations here)
+            self.classifier = LearningShapelets(n_shapelets_per_size=self.shapelet_sizes,
+                                        optimizer=tf.optimizers.Adam(.01),
+                                        scale=False,
+                                        weight_regularizer=.0001    ,
+                                        max_iter=300,
+                                        random_state=42,
+                                        verbose=0)
+            # self.classifier.fit(self.X, self.y)
+
+            
          
 
         else:
             return
 
     def cross_val_score(self, random_state=None):
+
         skf = StratifiedKFold(n_splits=cfg.params["n_splits"], shuffle=True, random_state=random_state)
 
         if cfg.params["classifier"] == "KNN":
@@ -203,6 +231,27 @@ class CSClassifier:
                 self.accuracy_score = sum(self.accuracy)/len(self.accuracy)
                 print(self.accuracy_score)
                 return self.accuracy_score
+
+        elif cfg.params["classifier"] == "SHP":
+            for train_index, test_index in skf.split(self.X, self.y):
+                X_train, X_test = self.X[train_index], self.X[test_index]
+                y_train, y_test = self.y[train_index], self.y[test_index]
+                X_train = TimeSeriesScalerMinMax().fit_transform(X_train)
+                X_test = TimeSeriesScalerMinMax().fit_transform(X_test)
+                #plt.plot(X_train)
+                #plt.plot(X_test)
+                self.classifier.fit(X_train, y_train)
+                pred_labels = self.classifier.predict(X_test)
+                score = accuracy_score(y_test, pred_labels)
+                self.accuracy.append(score)
+                #return self.accuracy_score
+            self.accuracy_score = sum(self.accuracy)/len(self.accuracy)
+            print("Accuracy", self.accuracy_score)
+            # Make predictions and calculate accuracy score
+            
+            #print("Correct classification rate:", accuracy_score(y_test, pred_labels))
+            if cfg.params["basic_visualization"]:
+                self.shapelet_visualization(self.shapelet_sizes)
                     
                     
 
@@ -314,11 +363,10 @@ class CSClassifier:
             print('Error message: ', err)
 
     def shapelet_visualization(self, shapelet_sizes):
-        XX = self.X
+        #XX = self.X
         distances = self.classifier.transform(self.X)
         # Make predictions and calculate accuracy score
-        pred_labels = self.classifier.predict(self.X)
-        print("Correct classification rate:", accuracy_score(self.y, pred_labels))
+        
 
         # Plot the different discovered shapelets
         plt.figure()
@@ -340,26 +388,7 @@ class CSClassifier:
         plt.xlabel("Epochs")
         plt.show()
 
-        viz = Visdom()
-        assert viz.check_connection()
-        try:
-            for i, sz in enumerate(shapelet_sizes.keys()):
-                viz.scatter(
-                    X=distances,
-                    Y=[cfg.params["cs_index_map"][x] for x in pred_labels],
-                    opts=dict(
-                        legend=list(cfg.params["cs_index_map"].keys()),
-                        markersize=5,
-                        title="%d shapelets of size %d" % (shapelet_sizes[sz], sz),
-                        xlabel="Distance to 1st Shapelet",
-                        ylabel="Distance to 2nd Shapelet",
-                        zlabel="Distance to 3rd Shapelet",
-                    )
-                )
-
-        except BaseException as err:
-            print('Skipped matplotlib example')
-            print('Error message: ', err)
+        
 
     def extract_df(self, X):
         columns_simple_features = ['act' + str(y) + ' ' + x for x in cfg.params["simple_features"] for y in
