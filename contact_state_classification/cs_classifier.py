@@ -120,7 +120,7 @@ class CSClassifier:
         if use_lda:
             self.lda()
            
-        if cfg.params["classifier"] == "MVC_1":
+        if cfg.params["classifier"] == "TSC":
             # Time series concatenation
             # Concatenation of time series columns into a single long time series column via ColumnConcatenator and apply a classifier to the concatenated data,
             #Time Series Forest Classifier
@@ -129,7 +129,6 @@ class CSClassifier:
                 ("classify", TimeSeriesForestClassifier(n_estimators=100)),
             ]
             self.classifier = Pipeline(steps)
-            print("MVC_1_shape", self.X.shape)
             self.classifier.fit(self.X, self.y)
 
         if cfg.params["classifier"] == "KNN":
@@ -163,15 +162,26 @@ class CSClassifier:
                 print(sum(score) / len(score))
 
 
-        elif cfg.params["classifier"] == "MVC_1":
+        elif cfg.params["classifier"] == "TSC":
 
-           for train_index, test_index in skf.split(self.X, self.y):
-                X_train, X_test = self.X[train_index], self.X[test_index]
-                y_train, y_test = self.y[train_index], self.y[test_index]
-                
-                self.classifier.fit(X_train, y_train)
+            if (cfg.params["use_test_set"]):
+                X_test, y_test = self.extract_features_from_df(self.csd_test_data_df)
                 pred_labels = self.classifier.predict(X_test)
                 print("Correct classification rate:", accuracy_score(y_test, pred_labels))
+            else:
+            
+                for train_index, test_index in skf.split(self.X, self.y):
+                    X_train, X_test = self.X[train_index], self.X[test_index]
+                    y_train, y_test = self.y[train_index], self.y[test_index]
+                    self.classifier.fit(X_train, y_train)
+                    pred_labels = self.classifier.predict(X_test)
+                    score = accuracy_score(y_test, pred_labels)
+                    self.accuracy.append(score)
+                    #return self.accuracy_score
+                self.accuracy_score = sum(self.accuracy)/len(self.accuracy)
+                print(self.accuracy_score)
+                return self.accuracy_score
+                    
                 
         
         elif cfg.params["classifier"] == "DTW":
@@ -185,8 +195,14 @@ class CSClassifier:
                 for train_index, test_index in skf.split(self.X, self.y):
                     X_train, X_test = self.X[train_index], self.X[test_index]
                     y_train, y_test = self.y[train_index], self.y[test_index]
+                    self.classifier.fit(X_train, y_train)
                     pred_labels = self.classifier.predict(X_test)
-                    print("Correct classification rate:", accuracy_score(y_test, pred_labels))
+                    score = accuracy_score(y_test, pred_labels)
+                    self.accuracy.append(score)
+                    #return self.accuracy_score
+                self.accuracy_score = sum(self.accuracy)/len(self.accuracy)
+                print(self.accuracy_score)
+                return self.accuracy_score
                     
                     
 

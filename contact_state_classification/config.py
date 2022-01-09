@@ -1,7 +1,7 @@
 # This is where all file names and path-related parameters are stored.
 path = {
     "experiment_dir": "/home/shounak/Desktop/TUB/contact_state_classification/contact_state_classification",
-    "dataset": ["RoboticsProject0112"],
+    "dataset": ["RoboticsProject0301"],
     "test_set": ["RoboticsProject2510_2"]
     #"test_set": ["RoboticsProject2510"]
 }
@@ -11,8 +11,8 @@ params = {
     "n_act": 12,
     "use_pca": False,
     "use_lda": False,
-    "use_test_set": True,
-    "simple_features": ["dist"],
+    "use_test_set": False,
+    "simple_features": ["dist", "obs_ee_theta"],
     "complex_features": [],
     "n_splits": 8,
     "n_neighbors": 4,
