@@ -1,3 +1,4 @@
+# from msilib.schema import SelfReg
 import os
 
 import matplotlib.pyplot as plt
@@ -22,17 +23,17 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-from sktime.classification.compose import ColumnEnsembleClassifier
-from sktime.classification.dictionary_based import BOSSEnsemble
-from sktime.classification.interval_based import TimeSeriesForestClassifier
-from sktime.classification.shapelet_based import MrSEQLClassifier
-from sktime.datasets import load_basic_motions
-from sktime.transformations.panel.compose import ColumnConcatenator
-from sktime.datasets import load_basic_motions
+# from sktime.classification.compose import ColumnEnsembleClassifier
+# from sktime.classification.dictionary_based import BOSSEnsemble
+# from sktime.classification.interval_based import TimeSeriesForestClassifier
+# from sktime.classification.shapelet_based import MrSEQLClassifier
+# from sktime.datasets import load_basic_motions
+# from sktime.transformations.panel.compose import ColumnConcatenator
+# from sktime.datasets import load_basic_motions
 import contact_state_classification as csc
 from . import config as cfg
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
+# from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
 from tslearn.preprocessing import TimeSeriesScalerMinMax
 
 
@@ -73,6 +74,9 @@ class CSClassifier:
         self.setup_classifier(cfg.params["use_pca"], cfg.params["use_lda"])
 
         self.get_dataset_information()
+        self.p = []
+        self.w1 = []
+        self.w2 = []
 
     def load_data(self):
         # load data to dict, because processing of dataframe takes too much time
@@ -179,11 +183,14 @@ class CSClassifier:
         skf = StratifiedKFold(n_splits=cfg.params["n_splits"], shuffle=True, random_state=random_state)
 
         if cfg.params["classifier"] == "KNN":
-
+            
 
             if (cfg.params["use_test_set"]):
                 X_test, y_test = self.extract_features_from_df(self.csd_test_data_df)
-                pred_labels = self.classifier.predict(X_test)
+                if cfg.params["use_pca"]==True:
+                    X_test = self.pca.transform(X_test)
+                    pred_labels = self.classifier.predict(X_test)
+            
                 print("Correct classification rate:", accuracy_score(y_test, pred_labels))
             else:
                 score = cross_val_score(self.classifier, self.X, self.y, cv=skf)
@@ -285,14 +292,30 @@ class CSClassifier:
     def pca(self):
         if len(self.X.shape) > 2:
             return
-        pca = PCA(n_components=cfg.params["n_components"], svd_solver='auto', whiten='true')
-        pca.fit(self.X)
-        self.X = pca.transform(self.X)
+        self.pca = PCA(n_components=cfg.params["n_components"], svd_solver='auto', whiten='true')
+        self.pca.fit(self.X)
+        self.X = self.pca.transform(self.X)
         print("X_pca",self.X.shape)
         print("variance_ratio:")
-        print(pca.explained_variance_ratio_)
+        print(self.pca.explained_variance_ratio_)
         print("variance:")
-        print(pca.explained_variance_)
+        print(self.pca.explained_variance_)
+        print("components")
+        self.p =abs(self.pca.components_ )
+        
+        val1 = 0.0
+        val2 = 0.0
+        for i in range(len(self.p)):
+            for j in range(0,12):
+                val1 += self.p[i][j]    
+            self.w1 = val1
+            for k in range(12,96):
+                val2 += self.p[i][k]
+            self.w2 = val2
+
+        print("w1 =",self.w1)
+        print("w2 =",self.w2)
+
 
     def lda(self):
         if len(self.X.shape) > 2:
@@ -301,6 +324,7 @@ class CSClassifier:
         lda.fit(self.X, self.y)
         self.X = lda.transform(self.X)
         print("LDA variance ratio:", lda.explained_variance_ratio_)
+        
 
     @staticmethod
     def extract_features_from_df(df):
