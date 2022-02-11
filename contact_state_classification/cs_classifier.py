@@ -303,18 +303,18 @@ class CSClassifier:
         print("components")
         self.p =abs(self.pca.components_ )
         
-        val1 = 0.0
-        val2 = 0.0
-        for i in range(len(self.p)):
-            for j in range(0,12):
-                val1 += self.p[i][j]    
-            self.w1 = val1
-            for k in range(12,96):
-                val2 += self.p[i][k]
-            self.w2 = val2
+        # val1 = 0.0
+        # val2 = 0.0
+        # for i in range(len(self.p)):
+        #     for j in range(0,12):
+        #         val1 += self.p[i][j]    
+        #     self.w1 = val1
+        #     for k in range(12,96):
+        #         val2 += self.p[i][k]
+        #     self.w2 = val2
 
-        print("w1 =",self.w1)
-        print("w2 =",self.w2)
+        #print("w1 =",self.w1)
+        #print("w2 =",self.w2)
 
 
     def lda(self):

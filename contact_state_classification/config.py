@@ -9,11 +9,11 @@ path = {
 # Since different classifiers may be used, parameters may need to be nested.
 params = {
     "n_act": 12,
-    "use_pca": True,
+    "use_pca": False,
     "use_lda": False,
     "use_test_set": False,
     "simple_features": ['dist' ],
-    "complex_features": ['error_q'],
+    "complex_features": [],
     "n_splits": 4,
     "n_neighbors": 4,
     "n_components": 2,
