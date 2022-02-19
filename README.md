@@ -66,3 +66,19 @@ https://upload.wikimedia.org/wikipedia/commons/d/dc/3D_Spherical_2.svg
 - [ ] 25.01-31.01 Implementing last best classifier (optional)
 - [ ] 01.02-07.02 Final Presentation + Testing on real robot, hopefully :) 
 - [ ] 08.02-14.02 Results, documentation and The report / Presentation
+
+### Requirement
+- numpy
+- pandas
+- tslearn
+- visdom
+- tensorflow
+- sktime
+- loguru
+
+### How to use
+1. Download the dataset from https://drive.google.com/drive/folders/1GyiogHXgIxUiuVfkc2BFoljfxg-VJTo3 and put it in `/home/shounak/Desktop/TUB/contact_state_classification/contact_state_classification`
+2. Check `contact_state_classification/config.py`, Add the features you want to use to `simple_features` and `complex_features` according to the table above, `simple_features` being features with only one dimension and `complex_features` being features with more than one dimension.
+3. Set the classifier you want to check using the `params` in `contact_state_classification/config.py`
+4. Run `test.py`, and check result in the console.
+5. Visualize the result by changing the `basic visualization` to `True` in `params` in `contact_state_classification/config.py`and run      `visdom` in a separate terminal.

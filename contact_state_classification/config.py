@@ -9,16 +9,16 @@ path = {
 # Since different classifiers may be used, parameters may need to be nested.
 params = {
     "n_act": 12,
-    "use_pca": False,
+    "use_pca": True,
     "use_lda": False,
     "use_test_set": False,
-    "simple_features": ['dist' ],
+    "simple_features": ['dist'],
     "complex_features": [],
     "n_splits": 4,
     "n_neighbors": 4,
     "n_components": 2,
-    "classifier": "KNN",
+    "classifier": "KNN", #SHP, DTW, TSC
     "cs_index_map": {"CS1": 1, "CS2": 2, "CS3": 3, "CS5": 4, "CS6": 5},
-    "basic_visualization": False,
+    "basic_visualization": True,
     "mvc_visualization":False
 }

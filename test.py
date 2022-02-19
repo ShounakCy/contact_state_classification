@@ -11,9 +11,9 @@ import contact_state_classification as csc
 import numpy as np
 from contact_state_classification import config as cfg
 import pandas as pd
-import seaborn as sns
+# import seaborn as sns
 import random
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from visdom import Visdom
 
 

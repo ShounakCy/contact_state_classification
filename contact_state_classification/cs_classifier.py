@@ -25,15 +25,15 @@ from sklearn.pipeline import Pipeline
 
 # from sktime.classification.compose import ColumnEnsembleClassifier
 # from sktime.classification.dictionary_based import BOSSEnsemble
-# from sktime.classification.interval_based import TimeSeriesForestClassifier
+from sktime.classification.interval_based import TimeSeriesForestClassifier
 # from sktime.classification.shapelet_based import MrSEQLClassifier
 # from sktime.datasets import load_basic_motions
-# from sktime.transformations.panel.compose import ColumnConcatenator
+from sktime.transformations.panel.compose import ColumnConcatenator
 # from sktime.datasets import load_basic_motions
 import contact_state_classification as csc
 from . import config as cfg
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-# from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
+from sktime.classification.distance_based import KNeighborsTimeSeriesClassifier
 from tslearn.preprocessing import TimeSeriesScalerMinMax
 
 
@@ -143,8 +143,8 @@ class CSClassifier:
             print("KNN_shape",self.X.shape)
             self.classifier.fit(self.X, self.y)
 
-            #if cfg.params["basic_visualization"]:
-             #   self.basic_visualization()
+            if cfg.params["basic_visualization"]:
+               self.basic_visualization()
         
         if cfg.params["classifier"] == "DTW":
             self.classifier = KNeighborsTimeSeriesClassifier(n_neighbors=cfg.params["n_neighbors"], distance="dtw")
@@ -167,7 +167,7 @@ class CSClassifier:
                                         optimizer=tf.optimizers.Adam(.01),
                                         scale=False,
                                         weight_regularizer=.0001    ,
-                                        max_iter=300,
+                                        max_iter=800,
                                         random_state=42,
                                         verbose=0)
             # self.classifier.fit(self.X, self.y)
@@ -187,14 +187,16 @@ class CSClassifier:
 
             if (cfg.params["use_test_set"]):
                 X_test, y_test = self.extract_features_from_df(self.csd_test_data_df)
+                pred_labels = self.classifier.predict(X_test)
                 if cfg.params["use_pca"]==True:
                     X_test = self.pca.transform(X_test)
                     pred_labels = self.classifier.predict(X_test)
             
                 print("Correct classification rate:", accuracy_score(y_test, pred_labels))
             else:
-                score = cross_val_score(self.classifier, self.X, self.y, cv=skf)
-                print(sum(score) / len(score))
+                self.accuracy_score = cross_val_score(self.classifier, self.X, self.y, cv=skf)
+                print(sum(self.accuracy_score) / len(self.accuracy_score))
+                return self.accuracy_score
 
 
         elif cfg.params["classifier"] == "TSC":
@@ -364,7 +366,8 @@ class CSClassifier:
         # Plot the distances
 
         viz = Visdom()
-        score = self.cross_val_score(42)
+        # score = self.cross_val_score(42)
+        # X=self.X
         assert viz.check_connection()
         try:
             viz.scatter(
@@ -373,13 +376,13 @@ class CSClassifier:
                 opts=dict(
                     legend=list(cfg.params["cs_index_map"].keys()),
                     markersize=10,
-                    title="After LDA with %d PC and Accuracy : %2f" %
-                          (cfg.params["n_components"], score),
+                    
+                          
 
-                    xlabel="DC1",
+                    xlabel="C1",
 
-                    ylabel="DC2",
-                    zlabel="DC3",
+                    ylabel="C2"
+                    
                 )
             )
         except BaseException as err:
